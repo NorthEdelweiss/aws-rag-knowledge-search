@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAG Portfolio - Deploy Test</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", "Yu Gothic", sans-serif;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      color: #e2e8f0;
+      padding: 24px;
+    }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+      backdrop-filter: blur(8px);
+    }
+    .badge {
+      display: inline-block;
+      background: #22c55e;
+      color: #06240f;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+    }
+    h1 { font-size: 24px; margin: 20px 0 8px; }
+    p { color: #94a3b8; line-height: 1.7; font-size: 15px; }
+    .meta {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      font-size: 13px;
+      color: #64748b;
+      text-align: left;
+    }
+    .meta div { display: flex; justify-content: space-between; padding: 4px 0; }
+    .meta span:last-child { color: #cbd5e1; font-family: ui-monospace, monospace; }
+    #ts { color: #38bdf8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="badge">✓ DEPLOY SUCCESS</span>
+    <h1>社内ナレッジ検索 RAG</h1>
+    <p>CloudFront + S3(OAC) の配信が正常に動作しています。<br>ここに React フロントエンドを載せていきます。</p>
+    <div class="meta">
+      <div><span>配信</span><span>CloudFront → S3</span></div>
+      <div><span>バケット公開</span><span>Block All（非公開）</span></div>
+      <div><span>読み込み時刻</span><span id="ts">—</span></div>
+    </div>
+  </div>
+  <script>
+    // ページが実際にブラウザで実行されていることの確認用（キャッシュ検証にも使える）
+    document.getElementById('ts').textContent = new Date().toLocaleString('ja-JP');
+  </script>
+</body>
+</html>

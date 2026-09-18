@@ -1,0 +1,27 @@
+# --- credentials: never commit ---
+*.pem
+*.key
+.env
+.env.*
+credentials
+
+# --- Terraform ---
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!example.tfvars
+*.tfplan
+*.tfplan.*
+*_override.tf
+# .terraform.lock.hcl IS committed (pin provider versions for every machine and CI)
+
+# --- Python ---
+__pycache__/
+.venv/
+venv/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
