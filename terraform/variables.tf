@@ -166,3 +166,15 @@ variable "github_branch" {
   type        = string
   default     = "main"
 }
+
+variable "github_owner_id" {
+  description = "GitHub オーナーの数値 ID。GitHub が ID 付きの sub（repo:owner@id/repo@id:...）を発行する場合に指定"
+  type        = string
+  default     = ""
+}
+
+variable "github_repository_id" {
+  description = "GitHub リポジトリの数値 ID。github_owner_id とセットで指定"
+  type        = string
+  default     = ""
+}

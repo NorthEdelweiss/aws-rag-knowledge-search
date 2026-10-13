@@ -225,6 +225,7 @@ terraform output -raw cmd_push_image                             # 初回イメ�
 | 14 | 取込タスクだけ Titan 呼出で AccessDenied | Task Role に Claude の ARN しか許可していなかった。ローカルでは自分の IAM ユーザーで動いていたため気付かなかった |
 | 15 | 文書にある答えが「該当なし」になる | 語彙の不一致による偽陰性（「RAG の設計判断」を参照） |
 | 18 | `get-login-password` を `docker login --password-stdin` にパイプすると 400 | PS 5.1 のパイプが末尾に CR を付ける。サブ式で `--password` に渡す |
+| 21 | GitHub Actions の OIDC で `AssumeRoleWithWebIdentity` が AccessDenied | GitHub が送る `sub` が `repo:<owner>@<owner_id>/<repo>@<repo_id>:...` という ID 付き形式だった。CloudTrail で実際の `sub` を確認し、信頼ポリシーを ID 付きの完全一致に変更。同名リポジトリの作り直しによるなりすましにも強くなる |
 
 ## 既知の課題と次の改善
 

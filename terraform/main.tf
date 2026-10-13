@@ -75,9 +75,11 @@ module "cicd" {
   count  = var.github_repository != "" ? 1 : 0
   source = "./modules/cicd"
 
-  name_prefix        = var.name_prefix
-  github_repository  = var.github_repository
-  github_branch      = var.github_branch
-  ecr_repository_arn = module.app.ecr_repository_arn
-  ecs_service_arn    = module.app.service_arn
+  name_prefix          = var.name_prefix
+  github_repository    = var.github_repository
+  github_branch        = var.github_branch
+  github_owner_id      = var.github_owner_id
+  github_repository_id = var.github_repository_id
+  ecr_repository_arn   = module.app.ecr_repository_arn
+  ecs_service_arn      = module.app.service_arn
 }

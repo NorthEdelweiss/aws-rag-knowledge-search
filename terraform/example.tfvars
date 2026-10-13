@@ -20,3 +20,7 @@ db_secret_recovery_window_days = 0
 # --- CI/CD（GitHub Actions OIDC）。公開リポジトリ名に合わせる。空なら IAM を作らない --------
 # github_repository = "your-github-user/your-public-repo"
 # github_branch     = "main"
+# GitHub が ID 付きの sub を発行する場合（AssumeRoleWithWebIdentity が AccessDenied になる時）は
+# CloudTrail のイベントに出た repo:<owner>@<owner_id>/<repo>@<repo_id> の数字を入れる
+# github_owner_id      = "12345678"
+# github_repository_id = "987654321"

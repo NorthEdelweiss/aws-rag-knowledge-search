@@ -26,6 +26,20 @@ resource "aws_iam_openid_connect_provider" "github" {
 }
 
 # --- 信頼ポリシー：このリポジトリのこのブランチからのみ AssumeRole 可 -------------
+# GitHub の sub クレームは 2 形式ある（トラブルシュート記録#21）：
+#   旧形式  repo:<owner>/<repo>:ref:refs/heads/<branch>
+#   ID 付き repo:<owner>@<owner_id>/<repo>@<repo_id>:ref:refs/heads/<branch>
+# ID 付きは、リポジトリを削除して同名で作り直された場合（なりすまし）でも ID が一致しないため安全。
+# 実際に届いた sub は CloudTrail の AssumeRoleWithWebIdentity イベント（userIdentity.userName）で確認できる。
+locals {
+  repo_parts = split("/", var.github_repository)
+  sub_repo = (
+    var.github_owner_id != "" && var.github_repository_id != ""
+    ? "${local.repo_parts[0]}@${var.github_owner_id}/${local.repo_parts[1]}@${var.github_repository_id}"
+    : var.github_repository
+  )
+}
+
 data "aws_iam_policy_document" "github_assume" {
   statement {
     sid     = "GitHubActionsOIDC"
@@ -47,7 +61,7 @@ data "aws_iam_policy_document" "github_assume" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:ref:refs/heads/${var.github_branch}"]
+      values   = ["repo:${local.sub_repo}:ref:refs/heads/${var.github_branch}"]
     }
   }
 }
