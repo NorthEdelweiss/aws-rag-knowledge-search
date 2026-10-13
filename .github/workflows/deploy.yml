@@ -1,0 +1,139 @@
+# ============================================================================
+# main への push → テスト → イメージ build → ECR push → ECS 再デプロイ → 安定待ち
+#
+#   認証は OIDC（長期アクセスキーを GitHub に置かない）。
+#   引き受ける Role は terraform/modules/cicd で作成した rag-tf-github-deploy-role。
+#   信頼ポリシーの sub が repo:<owner>/<repo>:ref:refs/heads/main に完全一致なので、
+#   main 以外のブランチや PR からは AWS 認証そのものが通らない。
+#
+#   設計上の責務分担：
+#     - タスク定義（CPU/メモリ・環境変数・secrets・IAM）は Terraform が管理
+#     - CI はイメージを更新して --force-new-deployment で :latest を引き直させるだけ
+#     → CI の Role に RegisterTaskDefinition / PassRole を渡さずに済む（最小権限）
+#
+#   リポジトリ側の事前設定（Settings → Secrets and variables → Actions）：
+#     Secret  AWS_DEPLOY_ROLE_ARN = terraform output -raw github_deploy_role_arn
+#     ※ ARN にはアカウント ID が含まれるため、公開リポジトリのファイルには書かず
+#       Secret に置く（ログ上もマスクされる）。
+# ============================================================================
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    # README 等の変更ではデプロイしない（アプリとこのワークフロー自身の変更だけ）
+    paths:
+      - "app/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: # 手動再デプロイ用（main で実行した時だけ OIDC が通る）
+
+# 連続 push で 2 本のデプロイが同時に走らないようにする（後勝ちにせず順番待ち）
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+# GITHUB_TOKEN は最小限。id-token: write が OIDC トークン発行に必要
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-1
+  ECR_REPOSITORY: rag-tf-api
+  ECS_CLUSTER: rag-tf-cluster
+  ECS_SERVICE: rag-tf-api-service
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 1. テスト：AWS 認証なしで回せる検査。ここで落ちたらイメージは作らない
+  # --------------------------------------------------------------------------
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12" # Dockerfile の python:3.12-slim と揃える
+          cache: pip
+          cache-dependency-path: app/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          pip install -r app/requirements.txt
+          pip install httpx  # FastAPI TestClient 用（テスト専用、イメージには入れない）
+
+      - name: Syntax check
+        run: python -m compileall -q app
+
+      - name: Smoke test (/health)
+        working-directory: app
+        # import 時に boto3 クライアントを作るが、生成だけなら認証情報は不要
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          import main
+
+          r = TestClient(main.app).get("/health")
+          assert r.status_code == 200, r.text
+          assert r.json() == {"status": "ok"}, r.text
+          print("health ok")
+          PY
+
+  # --------------------------------------------------------------------------
+  # 2. デプロイ：OIDC → build → ECR push → ECS 再デプロイ → 安定待ち
+  # --------------------------------------------------------------------------
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-deploy-${{ github.run_id }}
+          mask-aws-account-id: true # 公開リポジトリの Actions ログは誰でも読める
+
+      - name: Login to ECR
+        id: ecr
+        run: |
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          echo "::add-mask::${account_id}"
+          registry="${account_id}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$registry"
+          echo "registry=${registry}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+        # :<commit SHA> は追跡用（どのコミットが動いているか ECR で分かる）
+        # :latest はタスク定義が参照するタグ（タスク定義は Terraform 管理のため固定）
+        run: |
+          docker build -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:latest" app
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:latest"
+
+      - name: Redeploy ECS service
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --force-new-deployment \
+            --query 'service.{desired:desiredCount,running:runningCount}' \
+            --output table
+
+      - name: Wait for service to become stable
+        # desiredCount=0（消灯中）だと即座に安定扱いで終わる。動作確認は点灯してから
+        run: |
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].deployments[].{status:status,rollout:rolloutState,desired:desiredCount,running:runningCount}' \
+            --output table

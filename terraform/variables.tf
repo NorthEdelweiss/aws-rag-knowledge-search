@@ -141,9 +141,9 @@ variable "rag_min_similarity" {
 }
 
 variable "allowed_origins" {
-  description = "CORS 許可オリジン（カンマ区切り）。公開時はフロントの CloudFront ドメインに絞る"
+  description = "CORS 許可オリジン（カンマ区切り、例: https://dxxxx.cloudfront.net）。空＝ブラウザからのクロスオリジン呼び出しを全拒否"
   type        = string
-  default     = "*"
+  default     = ""
 }
 
 variable "log_retention_days" {

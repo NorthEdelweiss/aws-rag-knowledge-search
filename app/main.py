@@ -30,12 +30,13 @@ class UTF8JSONResponse(JSONResponse):
 
 app = FastAPI(title="RAG API", default_response_class=UTF8JSONResponse)
 
-# CORS: フロント(CloudFront)からブラウザ経由で叩けるように許可。
-# ⚠️ 既定の "*" は動作確認用。本番/公開前は環境変数 ALLOWED_ORIGINS に
-#    自分のCloudFrontドメインを設定して絞る（ECSのタスク定義で渡す）。
-#    → コード変更ではなく設定変更で閉じられるようにしてある。
+# CORS: 既定は「どのオリジンも許可しない」（ブラウザからのクロスオリジン呼び出しを拒否）。
+#   curl / PowerShell など非ブラウザのクライアントは CORS の対象外なので影響を受けない。
+#   ブラウザのフロント(CloudFront)から叩く時だけ、環境変数 ALLOWED_ORIGINS に
+#   そのドメインをカンマ区切りで設定する（ECS のタスク定義＝Terraform の allowed_origins で渡す）。
+#   → 開ける時もコード変更ではなく設定変更。"*" を既定にしないのは公開リポジトリとしての最低限。
 ALLOWED_ORIGINS = [
-    o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",") if o.strip()
+    o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()
 ]
 app.add_middleware(
     CORSMiddleware,
